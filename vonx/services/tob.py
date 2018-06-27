@@ -62,12 +62,16 @@ def assemble_issuer_spec(config: dict) -> dict:
             "endpoint": type_spec.get("issuer_url") or issuer_spec["issuer"]["url"],
             "schema": schema.name,
             "version": schema.version,
-            "source_claim": type_spec["source_claim"],
+            "topic": type_spec["topic"]
         }
 
         mapping = type_spec.get("mapping")
         if mapping:
             ctype["mapping"] = mapping
+
+        cardinality_fields = type_spec.get("cardinality_fields")
+        if cardinality_fields:
+            ctype["cardinality_fields"] = cardinality_fields
 
         ctypes.append(ctype)
     issuer_spec["credential_types"] = ctypes
