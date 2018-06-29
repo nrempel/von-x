@@ -100,7 +100,8 @@ def load_cred_definitions(values: list, schema_mgr: SchemaManager) -> list:
                 "schema": schema,
                 "topic": ctype["topic"],
                 # TODO: enforce some structure of mapping dict
-                "mapping": ctype.get("mapping")
+                "mapping": ctype.get("mapping"),
+                "cardinality_fields": ctype.get("cardinality_fields")
             }
         )
     return cred_types
