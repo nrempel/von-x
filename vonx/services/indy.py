@@ -169,7 +169,7 @@ class IndyStoredCredential(ServiceResponse):
     _fields = (
         ("holder_id", str),
         ("cred", IndyCredential),
-        ("result", dict),
+        ("result", str),
     )
 
 
