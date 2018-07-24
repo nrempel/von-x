@@ -15,19 +15,23 @@
 # limitations under the License.
 #
 
+"""
+Utility functions and classes
+"""
+
 import json
 import logging
 
 from .exchange import ExchangeMessage
-from .schema import Schema
 
 
 class MessageEncoder(json.JSONEncoder):
+    """
+    Customize JSONEncoder to automatically encode :class:`ExchangeMessage` instances
+    """
     def default(self, o):
         if isinstance(o, ExchangeMessage):
             return dict(o)
-        elif isinstance(o, Schema):
-            return o.__dict__
         return super(MessageEncoder, self).default(o)
 
 

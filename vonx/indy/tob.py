@@ -15,15 +15,22 @@
 # limitations under the License.
 #
 
+"""
+Connection handling specific to using TheOrgBook as a holder/prover
+"""
+
 import logging
 
-import aiohttp
-
-from .indy import (
-    IndyCredOffer,
-    IndyCredential,
-    IndyCredentialRequest,
-    IndyStoredCredential)
+from .connection import ConnectionBase, HttpSession
+from .errors import IndyConfigError, IndyConnectionError
+from .messages import (
+    CredentialOffer,
+    Credential,
+    CredentialRequest,
+    StoredCredential,
+    ProofRequest,
+    ConstructedProof,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -35,28 +42,30 @@ def assemble_issuer_spec(config: dict) -> dict:
     issuer_spec = {}
     issuer_email = config.get("email")
     if not issuer_email:
-        raise ValueError("Missing issuer email address")
+        raise IndyConfigError("Missing issuer email address")
     issuer_did = config.get("did")
     if not issuer_did:
-        raise ValueError("Missing issuer DID")
+        raise IndyConfigError("Missing issuer DID")
 
     issuer_spec["issuer"] = {
         "did": issuer_did,
-        "name": config.get("name", ""),
-        "abbreviation": config.get("abbreviation", ""),
+        "name": config.get("name") or "",
+        "abbreviation": config.get("abbreviation") or "",
         "email": issuer_email,
-        "url": config.get("url", ""),
+        "url": config.get("url") or "",
     }
 
     if not issuer_spec["issuer"]["name"]:
-        raise ValueError("Missing issuer name")
+        raise IndyConfigError("Missing issuer name")
 
     cred_type_specs = config.get("credential_types")
     if not cred_type_specs:
-        raise ValueError("Missing credential_types")
+        raise IndyConfigError("Missing credential_types")
     ctypes = []
     for type_spec in cred_type_specs:
         schema = type_spec["schema"]
+        if not type_spec.get("source_claim"):
+            raise IndyConfigError("Missing 'source_claim' for credential type")
         ctype = {
             "name": type_spec.get("description") or schema.name,
             "endpoint": type_spec.get("issuer_url") or issuer_spec["issuer"]["url"],
@@ -64,7 +73,6 @@ def assemble_issuer_spec(config: dict) -> dict:
             "version": schema.version,
             "topic": type_spec["topic"]
         }
-
         mapping = type_spec.get("mapping")
         if mapping:
             ctype["mapping"] = mapping
@@ -78,72 +86,50 @@ def assemble_issuer_spec(config: dict) -> dict:
     return issuer_spec
 
 
-class TobClientError(Exception):
-    """
-    A generic exception representing an issue with a TobClient operation
-    """
-
-    def __init__(self, status_code, message: str, response=None):
-        super(TobClientError, self).__init__(message)
-        self.status_code = status_code
-        self.message = message
-        self.response = response
-
-
-async def _handle_request_error(method: str, response=None):
-    """
-    Handle an exception or bad response from an HTTP request
-    """
-    if isinstance(response, Exception):
-        code = getattr(response, 'code', None)
-        raise TobClientError(
-            code,
-            "Exception during {}: ({}) {}".format(
-                method, code, str(response)
-            ),
-        )
-    if response and response.status != 200 and response.status != 201:
-        raise TobClientError(
-            response.status,
-            "Bad response from {}: ({}) {}".format(
-                method, response.status, await response.text()
-            ),
-            response,
-        )
-
-
-class TobClient:
+class TobConnection(ConnectionBase):
     """
     A class for managing communication with TheOrgBook API and performing the initial
     synchronization as an issuer
     """
 
-    def __init__(self, http_client, api_url: str):
-        self._http_client = http_client
-        self._api_url = api_url
+    def __init__(self, agent_id: str, agent_type: str, agent_params: dict, conn_params: dict):
+        super(TobConnection, self).__init__(agent_id, agent_type, agent_params, conn_params)
+        self._api_url = self.conn_params.get('api_url')
+        if not self._api_url:
+            raise IndyConfigError("Missing 'api_url' for TheOrgBook connection")
+        self._http_client = None
 
-    async def register_issuer(self, issuer_cfg: dict):
+    async def open(self, service: 'IndyService') -> None:
+        # TODO check DID is registered etc ..
+        self._http_client = service._agent_http_client(self.agent_id)
+
+    async def close(self) -> None:
+        """
+        Shut down the connection
+        """
+        if self._http_client:
+            await self._http_client.close()
+            self._http_client = None
+
+    async def sync(self) -> None:
         """
         Submit the issuer JSON definition to TheOrgBook to register our service
-
-        Args:
-            issuer_cfg: the issuer configuration to be converted into JSON format
         """
-        spec = assemble_issuer_spec(issuer_cfg)
-        response = await self.post_json(
-            "indy/register-issuer", spec
-        )
-        result = response.get("result")
-        if not response.get("success"):
-            raise TobClientError(
-                400,
-                "Issuer service was not registered: {}".format(result),
-                response,
+        if self.agent_type == 'issuer':
+            spec = assemble_issuer_spec(self.agent_params)
+            response = await self.post_json(
+                "indy/register-issuer", spec
             )
-        return result
+            result = response.get("result")
+            if not response.get("success"):
+                raise IndyConnectionError(
+                    "Issuer service was not registered: {}".format(result),
+                    400,
+                    response,
+                )
 
     async def generate_credential_request(
-            self, indy_offer: IndyCredOffer) -> IndyCredentialRequest:
+            self, indy_offer: CredentialOffer) -> CredentialRequest:
         """
         Ask the API to generate a credential request from our credential offer
 
@@ -159,19 +145,19 @@ class TobClient:
         LOGGER.debug("Credential request response: %s", response)
         result = response.get("result")
         if not response.get("success"):
-            raise TobClientError(
-                400,
+            raise IndyConnectionError(
                 "Could not create credential request: {}".format(result),
+                400,
                 response,
             )
-        return IndyCredentialRequest(
-            None,
+        return CredentialRequest(
             indy_offer,
             result["credential_request"],
-            result["credential_request_metadata"])
+            result["credential_request_metadata"],
+        )
 
     async def store_credential(
-            self, indy_cred: IndyCredential) -> IndyStoredCredential:
+            self, indy_cred: Credential) -> StoredCredential:
         """
         Ask the API to store a credential
 
@@ -190,26 +176,43 @@ class TobClient:
         LOGGER.debug("Store credential response: %s", response)
         result = response.get("result")
         if not response.get("success"):
-            raise TobClientError(
-                400,
+            raise IndyConnectionError(
                 "Credential was not stored: {}".format(result),
+                400,
                 response,
             )
-        return IndyStoredCredential(
+        return StoredCredential(
             None,
             indy_cred,
-            result)
+            result,
+        )
 
-    async def construct_proof(self, proof_request: dict):
+    async def construct_proof(self, request: ProofRequest,
+                              cred_ids: set = None, params: dict = None) -> ConstructedProof:
         """
         Ask the API to construct a proof from a proof request
 
         Args:
             proof_request: the prepared Indy proof request
         """
-        return await self.post_json(
-            "indy/construct-proof", proof_request
+        response = await self.post_json(
+            "indy/construct-proof", {
+                "source_id": params and params.get("source_id") or None,
+                "proof_request": request.request,
+                "cred_ids": list(cred_ids) if cred_ids else None,
+            }
         )
+        result = response.get("result")
+        if not response.get("success"):
+            raise IndyConnectionError(
+                "Error constructing proof: {}".format(result),
+                400,
+                response,
+            )
+        return ConstructedProof(
+            result,
+        )
+
 
     def get_api_url(self, path: str = None) -> str:
         """
@@ -230,26 +233,20 @@ class TobClient:
         A standard request to a `list`-style API method
 
         Args:
-            http_client: The :class:`ClientSession` instance responsible for adding
-                authentication headers
             path: The relative path to the API method
         """
         url = self.get_api_url(path)
         LOGGER.debug("fetch_list: %s", url)
-        try:
-            response = await self._http_client.get(url)
-        except aiohttp.ClientError as e:
-            response = e
-        await _handle_request_error('fetch_list', response)
-        return await response.json()
+        async with HttpSession("fetch_list", self._http_client) as handler:
+            response = await handler.client.get(url)
+            await handler.check_status(response)
+            return await response.json()
 
     async def post_json(self, path: str, data):
         """
         A standard POST request to an API method
 
         Args:
-            http_client: The :class:`ClientSession` instance responsible for adding
-                authentication headers
             path: The relative path to the API method
             data: The body of the request, to be converted to JSON
 
@@ -258,16 +255,7 @@ class TobClient:
         """
         url = self.get_api_url(path)
         LOGGER.debug("post_json: %s", url)
-        try:
-            response = await self._http_client.post(url, json=data)
-        except aiohttp.ClientError as e:
-            response = e
-        await _handle_request_error('post_json', response)
-        return await response.json()
-
-    async def __aenter__(self):
-        await self._http_client.__aenter__()
-        return self
-
-    async def __aexit__(self, exc_type, exc_value, traceback):
-        await self._http_client.__aexit__(exc_type, exc_value, traceback)
+        async with HttpSession("post_json", self._http_client) as handler:
+            response = await handler.client.post(url, json=data)
+            await handler.check_status(response)
+            return await response.json()

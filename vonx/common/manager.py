@@ -15,12 +15,23 @@
 # limitations under the License.
 #
 
+"""
+Implemention of the generic :class:`ServiceManager` class which is used to manage
+a collection of :class:`ServiceBase` instances
+"""
+
+
 import logging
 import os
 from typing import Mapping
 
-from .base import ServiceBase, ServiceStatus, ServiceStatusReq, ServiceResponse
+from . import config
 from . import exchange as exch
+from .service import (
+    ServiceBase,
+    ServiceStatus,
+    ServiceStatusReq,
+    ServiceResponse)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -89,15 +100,16 @@ class ServiceManager(ServiceBase):
         """
         Stop the message processor and any other services
         """
-        self._stop_services(wait)
+        super(ServiceManager, self).stop(wait)
         self._exchange.stop()
 
-    def _stop_services(self, wait: bool = True) -> None:
+    async def _service_stop(self) -> None:
         """
         Stop all registered services
         """
+        LOGGER.debug("Stopping managed services")
         for _id, service in self._services.items():
-            service.stop(wait)
+            service.stop()
 
     async def _get_status(self) -> ServiceResponse:
         """
@@ -197,3 +209,50 @@ class ServiceManager(ServiceBase):
             else:
                 return None
         return ploc[tg_name]
+
+
+class ConfigServiceManager(ServiceManager):
+    """
+    A :class:`ServiceManager` subclass with standard configuration loading methods
+    """
+
+    def __init__(self, env: Mapping = None, pid: str = 'manager'):
+        super(ConfigServiceManager, self).__init__(env, pid)
+        self._services_cfg = None
+
+    @property
+    def config_root(self) -> str:
+        """
+        Accessor for the value of the CONFIG_ROOT setting, defaulting to the current directory
+        """
+        return self._env.get('CONFIG_ROOT') or os.curdir
+
+    def load_config_path(self, settings_key, default_path, env=None) -> dict:
+        """
+        Load a YAML configuration file with defined variables replaced in the result
+
+        Args:
+            settings_key: the name of an environment variable defining an alternative
+                configuration path
+            default_path: the default path to the configuration file
+
+        Returns:
+            the parsed YAML configuration with variables replaced
+        """
+        path = self._env.get(settings_key)
+        if not path:
+            path = os.path.join(self.config_root, default_path)
+        return config.load_config(path, env or self._env)
+
+    def services_config(self, section: str) -> dict:
+        """
+        Load a named section from the global services.yml configuration
+
+        Args:
+            section: the configuration key
+        """
+        if self._services_cfg is None:
+            self._services_cfg = self.load_config_path('SERVICES_CONFIG_PATH', 'services.yml')
+        if self._services_cfg:
+            return self._services_cfg.get(section) or {}
+        return {}
