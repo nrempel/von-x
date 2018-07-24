@@ -15,12 +15,23 @@
 # limitations under the License.
 #
 
+"""
+Implemention of the generic :class:`ServiceManager` class which is used to manage
+a collection of :class:`ServiceBase` instances
+"""
+
+
 import logging
 import os
 from typing import Mapping
 
-from .base import ServiceBase, ServiceStatus, ServiceStatusReq, ServiceResponse
+from . import config
 from . import exchange as exch
+from .service import (
+    ServiceBase,
+    ServiceStatus,
+    ServiceStatusReq,
+    ServiceResponse)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -33,10 +44,10 @@ class ServiceManager(ServiceBase):
     with `start_process()` before the web server process has forked.
     """
 
-    def __init__(self, env: Mapping = None, pid: str = 'manager'):
+    def __init__(self, env: Mapping = None, pid: str = "manager"):
         super(ServiceManager, self).__init__(pid, exch.Exchange(), env or {})
         self._executor_cls = exch.RequestExecutor
-        self._proc_locals = {'pid': os.getpid()}
+        self._proc_locals = {"pid": os.getpid()}
         self._services = {}
         self._init_services()
 
@@ -89,25 +100,25 @@ class ServiceManager(ServiceBase):
         """
         Stop the message processor and any other services
         """
-        self._stop_services(wait)
+        super(ServiceManager, self).stop(wait)
         self._exchange.stop()
 
-    def _stop_services(self, wait: bool = True) -> None:
+    async def _service_stop(self) -> None:
         """
         Stop all registered services
         """
+        LOGGER.debug("Stopping managed services")
         for _id, service in self._services.items():
-            service.stop(wait)
+            service.stop()
 
     async def _get_status(self) -> ServiceResponse:
         """
         Return the current status of the service
         """
         status = self._status.copy()
-        status['services'] = {
-            svc_id: await self.get_service_status(svc_id)
-            for svc_id in self._services
-        }
+        status["services"] = {}
+        for svc_id, service in self._services:
+            status["services"][svc_id] = await self.get_service_status(svc_id)
         return ServiceStatus(status)
 
     @property
@@ -133,8 +144,8 @@ class ServiceManager(ServiceBase):
             a dictionary of currently-defined variables
         """
         pid = os.getpid()
-        if self._proc_locals['pid'] != pid:
-            self._proc_locals = {'pid': pid}
+        if self._proc_locals["pid"] != pid:
+            self._proc_locals = {"pid": pid}
         return self._proc_locals
 
     @property
@@ -145,11 +156,11 @@ class ServiceManager(ServiceBase):
         Note: this is called for each worker process started by the webserver.
         """
         ploc = self.proc_locals
-        if not 'executor' in ploc:
-            ident = 'exec-{}'.format(ploc['pid'])
-            ploc['executor'] = self._executor_cls(ident, self._exchange)
-            ploc['executor'].start()
-        return ploc['executor']
+        if not "executor" in ploc:
+            ident = "exec-{}".format(ploc["pid"])
+            ploc["executor"] = self._executor_cls(ident, self._exchange)
+            ploc["executor"].start()
+        return ploc["executor"]
 
     def get_service(self, name: str):
         """
@@ -161,7 +172,7 @@ class ServiceManager(ServiceBase):
         Returns:
             the service instance, or None if not found
         """
-        if name == 'manager':
+        if name == "manager":
             return self
         return self._services.get(name)
 
@@ -189,7 +200,7 @@ class ServiceManager(ServiceBase):
             loop: the current event loop, if any
         """
         ploc = self.proc_locals
-        tg_name = 'target_' + name
+        tg_name = "target_" + name
         if tg_name not in ploc:
             svc = self.get_service(name)
             if svc:
@@ -197,3 +208,50 @@ class ServiceManager(ServiceBase):
             else:
                 return None
         return ploc[tg_name]
+
+
+class ConfigServiceManager(ServiceManager):
+    """
+    A :class:`ServiceManager` subclass with standard configuration loading methods
+    """
+
+    def __init__(self, env: Mapping = None, pid: str = "manager"):
+        super(ConfigServiceManager, self).__init__(env, pid)
+        self._services_cfg = None
+
+    @property
+    def config_root(self) -> str:
+        """
+        Accessor for the value of the CONFIG_ROOT setting, defaulting to the current directory
+        """
+        return self._env.get("CONFIG_ROOT") or os.curdir
+
+    def load_config_path(self, settings_key, default_path, env=None) -> dict:
+        """
+        Load a YAML configuration file with defined variables replaced in the result
+
+        Args:
+            settings_key: the name of an environment variable defining an alternative
+                configuration path
+            default_path: the default path to the configuration file
+
+        Returns:
+            the parsed YAML configuration with variables replaced
+        """
+        path = self._env.get(settings_key)
+        if not path:
+            path = os.path.join(self.config_root, default_path)
+        return config.load_config(path, env or self._env)
+
+    def services_config(self, section: str) -> dict:
+        """
+        Load a named section from the global services.yml configuration
+
+        Args:
+            section: the configuration key
+        """
+        if self._services_cfg is None:
+            self._services_cfg = self.load_config_path("SERVICES_CONFIG_PATH", "services.yml")
+        if self._services_cfg:
+            return self._services_cfg.get(section) or {}
+        return {}
