@@ -714,7 +714,7 @@ class IndyLedger(ServiceBase):
                             "version": definition.version,
                             "attr_names": definition.attr_names,
                         }
-                    ), indent=2)
+                    ))
                 LOGGER.debug('\n\n\n\n\n')
                 LOGGER.debug('============')
 
