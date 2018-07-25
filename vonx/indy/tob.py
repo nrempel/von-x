@@ -63,6 +63,13 @@ def assemble_issuer_spec(config: dict) -> dict:
         raise IndyConfigError("Missing credential_types")
     ctypes = []
     for type_spec in cred_type_specs:
+
+        print('=================')
+        print('\n\n\n\n')
+        print(type_spec)
+        print('\n\n\n\n')
+        print('=================')
+
         schema = type_spec["schema"]
         ctype = {
             "name": type_spec.get("description") or schema.name,
