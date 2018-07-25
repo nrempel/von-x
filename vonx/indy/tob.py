@@ -64,11 +64,11 @@ def assemble_issuer_spec(config: dict) -> dict:
     ctypes = []
     for type_spec in cred_type_specs:
 
-        LOGGER.debug('=================')
-        LOGGER.debug('\n\n\n\n')
-        LOGGER.debug(type_spec)
-        LOGGER.debug('\n\n\n\n')
-        LOGGER.debug('=================')
+        print('=================')
+        print('\n\n\n\n')
+        print(type_spec)
+        print('\n\n\n\n')
+        print('=================')
 
         schema = type_spec["schema"]
         ctype = {
