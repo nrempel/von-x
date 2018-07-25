@@ -218,6 +218,8 @@ class AgentCfg:
                     type_spec["issuer_url"] = params["issuer_url"]
                 if "mapping" in params:
                     type_spec["mapping"] = params["mapping"]
+                if "topic" in params:
+                    type_spec["topic"] = params["topic"]
                 cred_specs.append(type_spec)
             return {
                 "abbreviation": self.abbreviation,
