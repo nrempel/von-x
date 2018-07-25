@@ -35,8 +35,6 @@ def load_credential_type(ctype, schema_mgr: SchemaManager) -> dict:
     """
     Load the credential types defined by our config into a standard format
     """
-    if "source_claim" not in ctype:
-        raise IndyConfigError("Credential type must define 'source_claim'")
     if "schema" not in ctype:
         raise IndyConfigError("Credential type must define 'schema'")
     if isinstance(ctype["schema"], str):
@@ -69,7 +67,7 @@ def load_credential_type(ctype, schema_mgr: SchemaManager) -> dict:
         "origin_did": origin_did,
         "attributes": attributes,
         "params": {
-            "source_claim": ctype["source_claim"],
+
         }
     }
     if "description" in ctype:

@@ -64,8 +64,6 @@ def assemble_issuer_spec(config: dict) -> dict:
     ctypes = []
     for type_spec in cred_type_specs:
         schema = type_spec["schema"]
-        if not type_spec.get("source_claim"):
-            raise IndyConfigError("Missing 'source_claim' for credential type")
         ctype = {
             "name": type_spec.get("description") or schema.name,
             "endpoint": type_spec.get("issuer_url") or issuer_spec["issuer"]["url"],

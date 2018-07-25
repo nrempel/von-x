@@ -211,7 +211,6 @@ class AgentCfg:
                 params = cred_type["params"]
                 type_spec = {
                     "schema": cred_type["definition"],
-                    "source_claim": params.get("source_claim"),
                 }
                 if "description" in params:
                     type_spec["description"] = params["description"]
