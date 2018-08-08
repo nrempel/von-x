@@ -641,6 +641,12 @@ class IndyService(ServiceBase):
         """
 
         cred_offer = request.cred_offer
+
+        LOGGER.info('---')
+        LOGGER.info(json.dumps(cred_offer.offer))
+        LOGGER.info(json.dumps(request.data))
+        LOGGER.info(json.dumps(cred_data))
+
         (cred_json, cred_revoc_id) = await issuer.instance.create_cred(
             json.dumps(cred_offer.offer),
             request.data,
