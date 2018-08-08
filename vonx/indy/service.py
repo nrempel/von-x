@@ -1019,7 +1019,8 @@ class IndyService(ServiceBase):
 
         elif isinstance(request, GenerateProofRequestReq):
             try:
-                reply = await self._generate_proof_request(request.spec_id)
+                reply = await self._generate_proof_request(
+                    request.spec_id, request.credential_id)
             except IndyError as e:
                 reply = IndyServiceFail(str(e))
 
