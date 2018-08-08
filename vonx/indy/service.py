@@ -93,7 +93,7 @@ def _make_id(pfx: str = '', length=12) -> str:
     return pfx + ''.join(random.choice(string.ascii_letters) for _ in range(length))
 
 
-def _prepare_proof_request(spec: ProofSpecCfg) -> ProofRequest:
+def _prepare_proof_request(spec: ProofSpecCfg, credential_id: str) -> ProofRequest:
     """
     Prepare the JSON payload for a proof request
 
@@ -107,9 +107,10 @@ def _prepare_proof_request(spec: ProofSpecCfg) -> ProofRequest:
         for attr in schema["attributes"]:
             req_attrs["{}_{}_uuid".format(s_uniq, attr)] = {
                 "name": attr,
-                "restrictions": [{
-                    "schema_id": s_id,
-                }]
+                "credential_id": credential_id
+                # "restrictions": [{
+                #     "schema_id": s_id,
+                # }]
             }
     return ProofRequest({
         "name": spec.spec_id,
@@ -820,7 +821,8 @@ class IndyService(ServiceBase):
             msg = IndyServiceFail("Unregistered proof spec: {}".format(spec_id))
         return msg
 
-    async def _generate_proof_request(self, spec_id: str) -> ProofRequest:
+    async def _generate_proof_request(
+            self, spec_id: str, credential_id: str) -> ProofRequest:
         """
         Create a proof request from a previously registered proof specification
         """
@@ -829,7 +831,7 @@ class IndyService(ServiceBase):
             raise IndyConfigError("Proof specification not defined: {}".format(spec_id))
         if not spec.synced:
             raise IndyConfigError("Proof specification not synced: {}".format(spec_id))
-        return _prepare_proof_request(spec)
+        return _prepare_proof_request(spec, credential_id)
 
     async def _request_proof(self, connection_id: str, proof_req: ProofRequest,
                              cred_ids: set = None, params: dict = None) -> VerifiedProof:
