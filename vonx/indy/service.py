@@ -836,6 +836,7 @@ class IndyService(ServiceBase):
         if not spec:
             raise IndyConfigError("Proof specification not defined: {}".format(spec_id))
         if not spec.synced:
+            LOGGER.info(spec)
             raise IndyConfigError("Proof specification not synced: {}".format(spec_id))
         return _prepare_proof_request(spec, credential_id)
 
