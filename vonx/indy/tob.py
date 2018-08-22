@@ -72,6 +72,7 @@ def assemble_issuer_spec(config: dict) -> dict:
             "schema": schema.name,
             "version": schema.version,
             "topic": type_spec["topic"],
+            "credential": type_spec["credential"],
         }
         for k in ("mapping", "cardinality_fields"):
             if k in type_spec:
