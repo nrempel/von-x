@@ -92,7 +92,9 @@ from .messages import (
     ResolveNymReq,
     ResolvedNym,
     CredentialDependenciesReq,
-    CredentialDependencies
+    CredentialDependencies,
+    EndpointReq,
+    Endpoint
 )
 
 LOGGER = logging.getLogger(__name__)
@@ -1032,6 +1034,17 @@ class IndyService(ServiceBase):
         return CredentialDependencies(dependencies)
 
 
+    async def _get_endpoint(self, did: str) -> Endpoint:
+        """
+        Resolve a did to an endpoint
+        """
+
+        for _, agent in self._agents.items():
+            if not agent.synced:
+                raise IndyConfigError("Agent is not yet synchronized: {}".format(agent.agent_id))
+            endpoint = await agent.get_endpoint(did)
+            return Endpoint(endpoint)
+
     async def _verify_proof(self, verifier_id: str, proof_req: ProofRequest,
                             proof: ConstructedProof) -> VerifiedProof:
         """
@@ -1262,6 +1275,12 @@ class IndyService(ServiceBase):
             try:
                 reply = await self._get_credential_dependencies(
                     request.schema_name, request.schema_version, request.origin_did)
+            except IndyError as e:
+                reply = IndyServiceFail(str(e))
+
+        elif isinstance(request, EndpointReq):
+            try:
+                reply = await self._get_endpoint(request.did)
             except IndyError as e:
                 reply = IndyServiceFail(str(e))
 

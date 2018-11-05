@@ -407,6 +407,21 @@ class CredentialDependencies(IndyServiceRep):
         ("dependencies", list),
     )
 
+class EndpointReq(IndyServiceReq):
+    """
+    Get endpoint for a did
+    """
+    _fields = (
+        ("did", str),
+    )
+
+class Endpoint(IndyServiceRep):
+    """
+    The message class representing an agent's endpoint
+    """
+    _fields = (
+        ("endpoint", str),
+    )
 
 class ResolveNymReq(IndyServiceReq):
     """

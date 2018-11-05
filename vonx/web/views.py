@@ -279,16 +279,20 @@ async def get_credential_dependencies(request):
         client = indy_client(request)
         result = await client.get_credential_dependencies(schema_name, schema_version, origin_did)
         dependencies = result.dependencies
+
         ret = {
             "success": True,
-            "result": [
-                {
-                    "schema_name": dependency.name,
-                    "schema_version": dependency.version,
-                    "origin_did": dependency.origin_did
-                } for dependency in dependencies
-            ]
+            "result": []
         }
+
+        for dependency in dependencies:
+            endpoint = await client.get_endpoint(dependency.origin_did)
+            ret["result"].append({
+                "schema_name": dependency.name,
+                "schema_version": dependency.version,
+                "endpoint": endpoint.endpoint
+            })
+
     except IndyClientError as e:
         ret = {"success": False, "result": str(e)}
     return web.json_response(ret)

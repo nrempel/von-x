@@ -73,6 +73,8 @@ from .messages import (
     VerifyProofReq,
     ResolveNymReq,
     ResolvedNym,
+    EndpointReq,
+    Endpoint
 )
 
 import logging
@@ -348,6 +350,16 @@ class IndyClient:
         """
         return await self._fetch(
             CredentialDependenciesReq(name, version, origin_did), CredentialDependencies)
+
+    async def get_endpoint(self, did: str) -> Endpoint:
+        """
+        Get an endpoint for a did
+
+        Args:
+            did: the did to resolve
+        """
+        return await self._fetch(
+            EndpointReq(did), Endpoint)
 
     async def construct_proof(self, holder_id: str, proof_req: dict,
                               wql_filters: dict = None, cred_ids: set = None) -> ConstructedProof:
