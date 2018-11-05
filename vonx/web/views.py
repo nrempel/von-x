@@ -258,3 +258,37 @@ async def construct_proof(request, holder_id: str = None):
     response = web.json_response(ret)
     response["proof"] = proof
     return response
+
+
+async def get_credential_dependencies(request):
+    """
+    Gets the dependencies for a given credential type
+   
+    Expected query parameters are:
+        - schema_name
+        - schema_version
+        - origin_did
+
+    Returns: A graph of the credential's dependencies
+    """
+    schema_name = request.query.get("schema_name")
+    schema_version = request.query.get("schema_version")
+    origin_did = request.query.get("origin_did")
+
+    try:
+        client = indy_client(request)
+        result = await client.get_credential_dependencies(schema_name, schema_version, origin_did)
+        dependencies = result.dependencies
+        ret = {
+            "success": True,
+            "result": [
+                {
+                    "schema_name": dependency.name,
+                    "schema_version": dependency.version,
+                    "origin_did": dependency.origin_did
+                } for dependency in dependencies
+            ]
+        }
+    except IndyClientError as e:
+        ret = {"success": False, "result": str(e)}
+    return web.json_response(ret)

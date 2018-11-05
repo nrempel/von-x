@@ -135,6 +135,7 @@ class RegisterCredentialTypeReq(IndyServiceReq):
         ("origin_did", str),
         ("attr_names", Sequence),
         ("config", dict),
+        ("dependencies", list)
     )
 
 
@@ -387,6 +388,25 @@ class VerifiedProof(IndyServiceRep):
         ("parsed_proof", dict),
         ("proof", ConstructedProof),
     )
+
+class CredentialDependenciesReq(IndyServiceReq):
+    """
+    Get dependencies for a credential
+    """
+    _fields = (
+        ("schema_name", str),
+        ("schema_version", str),
+        ("origin_did", str),
+    )
+
+class CredentialDependencies(IndyServiceRep):
+    """
+    The message class representing a credential's dependencies
+    """
+    _fields = (
+        ("dependencies", list),
+    )
+
 
 class ResolveNymReq(IndyServiceReq):
     """

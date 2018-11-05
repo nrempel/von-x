@@ -91,6 +91,8 @@ from .messages import (
     VerifyProofReq,
     ResolveNymReq,
     ResolvedNym,
+    CredentialDependenciesReq,
+    CredentialDependencies
 )
 
 LOGGER = logging.getLogger(__name__)
@@ -288,7 +290,8 @@ class IndyService(ServiceBase):
 
     def _add_credential_type(self, issuer_id: str, schema_name: str,
                              schema_version: str, origin_did: str,
-                             attr_names: Sequence, config: Mapping = None) -> None:
+                             attr_names: Sequence, dependencies: list,
+                             config: Mapping = None) -> None:
         """
         Add a credential type to a given issuer
 
@@ -298,12 +301,19 @@ class IndyService(ServiceBase):
             schema_version: the version of the schema used by the credential type
             origin_did: the DID of the service issuing the schema (optional)
             attr_names: a list of schema attribute names
+            dependencies: list of dependencies - must be names of valid defined proof requests
             config: additional configuration for the credential type
         """
         agent = self._agents[issuer_id]
         if not agent:
             raise IndyConfigError("Agent ID not registered: {}".format(issuer_id))
-        schema = SchemaCfg(schema_name, schema_version, attr_names, origin_did)
+
+        dependency_configs = []
+        for dependency in dependencies:
+            spec = self._proof_specs.get(dependency)
+            dependency_configs.append(spec)
+
+        schema = SchemaCfg(schema_name, schema_version, attr_names, origin_did, dependency_configs)
         agent.add_credential_type(schema, **(config or {}))
 
     def _add_connection(self, connection_type: str, agent_id: str, **params) -> str:
@@ -1004,6 +1014,24 @@ class IndyService(ServiceBase):
         proof = await conn.instance.construct_proof(proof_req, cred_ids, params)
         return await self._verify_proof(verifier.agent_id, proof_req, proof)
 
+    async def _get_credential_dependencies(self, schema_name: str, schema_version: str, origin_did: str) -> CredentialDependencies:
+        """
+        Request dependencies for a credential
+        """
+
+        dependencies = []
+        for _, agent in self._agents.items():
+            if not agent.synced:
+                raise IndyConfigError("Agent is not yet synchronized: {}".format(agent.agent_id))
+            credential_type = agent.find_credential_type(schema_name, schema_version, origin_did)
+            if credential_type:
+                for dependency in credential_type['definition'].dependency_configs:
+                    for schema in dependency.schemas:
+                        dependencies.append(schema["definition"])
+
+        return CredentialDependencies(dependencies)
+
+
     async def _verify_proof(self, verifier_id: str, proof_req: ProofRequest,
                             proof: ConstructedProof) -> VerifiedProof:
         """
@@ -1136,6 +1164,7 @@ class IndyService(ServiceBase):
                     request.schema_version,
                     request.origin_did,
                     request.attr_names,
+                    request.dependencies,
                     request.config)
                 reply = IndyServiceAck()
             except IndyError as e:
@@ -1226,6 +1255,13 @@ class IndyService(ServiceBase):
         elif isinstance(request, GenerateProofRequestReq):
             try:
                 reply = await self._generate_proof_request(request.spec_id, request.wql_filters)
+            except IndyError as e:
+                reply = IndyServiceFail(str(e))
+
+        elif isinstance(request, CredentialDependenciesReq):
+            try:
+                reply = await self._get_credential_dependencies(
+                    request.schema_name, request.schema_version, request.origin_did)
             except IndyError as e:
                 reply = IndyServiceFail(str(e))
 
