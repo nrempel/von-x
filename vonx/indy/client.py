@@ -24,6 +24,7 @@ from typing import Sequence
 
 from ..common.exchange import RequestTarget
 from ..common.service import (
+    ServiceFail,
     ServiceAck,
     ServiceRequest,
     ServiceSyncReq,
@@ -96,7 +97,7 @@ class IndyClient:
         """
         result = await self._target.request(request)
 
-        if isinstance(result, IndyServiceFail):
+        if isinstance(result, IndyServiceFail) or isinstance(result, ServiceFail):
             raise IndyClientError(result.value)
         elif expect and not isinstance(result, expect):
             raise IndyClientError("Unexpected result: {}".format(result))
@@ -349,7 +350,7 @@ class IndyClient:
             origin_did: the DID of the schema issuer
         """
         return await self._fetch(
-            CredentialDependenciesReq(name, version, origin_did), CredentialDependencies)
+            CredentialDependenciesReq(name, version, origin_did))
 
     async def get_endpoint(self, did: str) -> Endpoint:
         """

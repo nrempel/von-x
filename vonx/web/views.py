@@ -23,7 +23,7 @@ View classes for handling AJAX requests as an issuer or holder service
 import json
 import logging
 
-from aiohttp import web
+from aiohttp import ClientSession, web
 
 from ..common.util import log_json, normalize_credential_ids
 from ..indy.client import IndyClientError
@@ -263,7 +263,7 @@ async def construct_proof(request, holder_id: str = None):
 async def get_credential_dependencies(request):
     """
     Gets the dependencies for a given credential type
-   
+
     Expected query parameters are:
         - schema_name
         - schema_version
@@ -278,20 +278,22 @@ async def get_credential_dependencies(request):
     try:
         client = indy_client(request)
         result = await client.get_credential_dependencies(schema_name, schema_version, origin_did)
-        dependencies = result.dependencies
+
+        # def build_result(deps):
+        #     LOGGER.info('----deps-----')
+        #     LOGGER.info(deps)
+        #     return [
+        #         {
+        #             "schema_name": dependency.name,
+        #             "schema_version": dependency.version,
+        #             "dependencies": build_result(dependency.dependencies)
+        #         } for dependency in deps
+        #     ]
 
         ret = {
             "success": True,
-            "result": []
+            "result": result
         }
-
-        for dependency in dependencies:
-            endpoint = await client.get_endpoint(dependency.origin_did)
-            ret["result"].append({
-                "schema_name": dependency.name,
-                "schema_version": dependency.version,
-                "endpoint": endpoint.endpoint
-            })
 
     except IndyClientError as e:
         ret = {"success": False, "result": str(e)}

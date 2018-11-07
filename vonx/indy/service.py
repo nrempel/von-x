@@ -20,6 +20,7 @@ The Indy service implements handlers for all the ledger-related messages, sychro
 agents and connections, and handles the core logic for working with credentials and proofs.
 """
 
+import aiohttp
 import asyncio
 import base64
 import json
@@ -307,6 +308,7 @@ class IndyService(ServiceBase):
             config: additional configuration for the credential type
         """
         agent = self._agents[issuer_id]
+
         if not agent:
             raise IndyConfigError("Agent ID not registered: {}".format(issuer_id))
 
@@ -314,7 +316,7 @@ class IndyService(ServiceBase):
         for dependency in dependencies:
             spec = self._proof_specs.get(dependency)
             dependency_configs.append(spec)
-
+            
         schema = SchemaCfg(schema_name, schema_version, attr_names, origin_did, dependency_configs)
         agent.add_credential_type(schema, **(config or {}))
 
@@ -1022,16 +1024,106 @@ class IndyService(ServiceBase):
         """
 
         dependencies = []
-        for _, agent in self._agents.items():
-            if not agent.synced:
-                raise IndyConfigError("Agent is not yet synchronized: {}".format(agent.agent_id))
-            credential_type = agent.find_credential_type(schema_name, schema_version, origin_did)
-            if credential_type:
-                for dependency in credential_type['definition'].dependency_configs:
-                    for schema in dependency.schemas:
-                        dependencies.append(schema["definition"])
 
-        return CredentialDependencies(dependencies)
+        did_agent = None
+        if origin_did:
+            for _, agent in self._agents.items():
+                if agent.did == origin_did:
+                    did_agent = agent
+                    break
+
+        if not did_agent:
+            # hack for now
+            for _, agent in self._agents.items():
+                did_agent = agent
+                break
+
+        if not did_agent.synced:
+            raise IndyConfigError("Agent is not yet synchronized: {}".format(did_agent.agent_id))
+
+            
+        LOGGER.info('-------------')
+        LOGGER.info(origin_did)
+        LOGGER.info(did_agent.did)
+        LOGGER.info(did_agent.did != origin_did)
+        if origin_did and did_agent.did != origin_did:
+            LOGGER.info('------HOP--------')
+            # If we are given a did and it is not this agent's did, we attempt to
+            # hop to the next agent and continue to recurse
+            endpoint = await self._get_endpoint(origin_did)
+            endpoint = endpoint.endpoint
+            if not endpoint:
+                raise IndyError(
+                    "Attempted to resolve dependencies for schema name: " +
+                    "{}, version: {}, and did: {} but there is no endpoint published for did {}".format(
+                        schema_name, schema_version, origin_did, origin_did
+                    ))
+
+            # TODO: move this into HTTPClient
+            try:
+                async with self.http as client:
+                    response = await client.get("{}/get-credential-dependencies".format(endpoint), params={
+                        "schema_name": schema_name,
+                        "schema_version": schema_version,
+                        "origin_did": origin_did
+                    })
+                resp_json = await response.text()
+                resp = json.loads(resp_json)
+
+                success = resp["success"]
+                result = resp["result"]
+
+                LOGGER.info('------resp--------')
+                LOGGER.info(resp)
+
+                if success is False:
+                    raise IndyError("Agent at endpoint {} responded with error: {}".format(endpoint, result))
+
+                for dependency in result:
+
+                    LOGGER.info('------dependency--------')
+                    LOGGER.info(dependency)
+
+                    schema_name = dependency["schema_name"]
+                    schema_version = dependency["schema_version"]
+                    origin_did = dependency["origin_did"]
+
+                    dependency_dependencies = await self._get_credential_dependencies(
+                        schema_name,
+                        schema_version,
+                        origin_did
+                    )
+
+                    dependencies.append({
+                        "schema_name": schema_name,
+                        "schema_version": schema_version,
+                        "origin_did": origin_did,
+                        "dependencies": dependency_dependencies
+                    })
+
+            except json.decoder.JSONDecodeError:
+                raise IndyError("Could not parse respoonse from {}".format(endpoint))
+            except aiohttp.client_exceptions.ClientConnectorError:
+                raise IndyError("Could not connect to endpoint {}".format(endpoint))
+        else:
+            LOGGER.info('------NOT HOP--------')
+            credential_type = did_agent.find_credential_type(schema_name, schema_version, origin_did)
+            if credential_type:
+                for proof_request in credential_type['definition'].dependencies:
+                    if proof_request:
+                        for schema in proof_request.schemas:
+                            dependency = schema["definition"]
+                            if not dependency.compare(SchemaCfg(schema_name, schema_version, None, origin_did)):
+                                dependency.dependencies = await self._get_credential_dependencies(dependency.name, dependency.version, dependency.origin_did)
+
+                            dependencies.append({
+                                "schema_name": dependency.name,
+                                "schema_version": dependency.version,
+                                "origin_did": dependency.origin_did,
+                                "dependencies": dependency.dependencies
+                            })
+
+        return dependencies
 
 
     async def _get_endpoint(self, did: str) -> Endpoint:

@@ -45,13 +45,13 @@ def load_credential_type(ctype, schema_mgr: SchemaManager) -> dict:
         version = None
         origin_did = None
         attributes = None
-        dependencies = ctype.get("depends_on")
+        dependencies = ctype.get("depends_on") or []
     elif isinstance(ctype["schema"], dict):
         name = ctype["schema"].get("name")
         version = ctype["schema"].get("version")
         origin_did = ctype["schema"].get("origin_did")
         attributes = ctype["schema"].get("attributes")
-        dependencies = ctype.get("depends_on")
+        dependencies = ctype.get("depends_on") or []
     else:
         raise IndyConfigError("Credential type schema must be string or dict")
     if not name:
