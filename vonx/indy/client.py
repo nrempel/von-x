@@ -340,7 +340,7 @@ class IndyClient:
             ResolvedSchema)
 
     async def get_credential_dependencies(self, name: str, version: str = None,
-                             origin_did: str = None) -> CredentialDependencies:
+                             origin_did: str = None, dependency_graph=None) -> CredentialDependencies:
         """
         Get a credentials dependencies
 
@@ -348,9 +348,10 @@ class IndyClient:
             name: the schema name
             version: the schema version
             origin_did: the DID of the schema issuer
+            dependency_graph: dependency graph for this dependency
         """
         return await self._fetch(
-            CredentialDependenciesReq(name, version, origin_did))
+            CredentialDependenciesReq(name, version, origin_did, dependency_graph))
 
     async def get_endpoint(self, did: str) -> Endpoint:
         """

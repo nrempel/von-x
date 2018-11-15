@@ -269,15 +269,29 @@ async def get_credential_dependencies(request):
         - schema_version
         - origin_did
 
-    Returns: A graph of the credential's dependencies
+    Body of the request optionally contains json dependency graph representation
+
+    Returns: A graph of the credential's dependencies in json
     """
     schema_name = request.query.get("schema_name")
     schema_version = request.query.get("schema_version")
     origin_did = request.query.get("origin_did")
 
+    dependency_graph = None 
+    
+    try:
+        dependency_graph = await get_request_json(request)
+    except IndyRequestError: 
+        pass
+
     try:
         client = indy_client(request)
-        result = await client.get_credential_dependencies(schema_name, schema_version, origin_did)
+        result = await client.get_credential_dependencies(
+            schema_name,
+            schema_version,
+            origin_did,
+            dependency_graph
+        )
 
         # def build_result(deps):
         #     LOGGER.info('----deps-----')

@@ -34,5 +34,6 @@ setup(
         'aiohttp-jinja2~=1.1.0',
         'PyYAML',
         'von-anchor==1.6.34',
+        'networkx>=2.2,<3'
     ],
 )
