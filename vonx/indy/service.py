@@ -1035,13 +1035,13 @@ class IndyService(ServiceBase):
 
         did_agent = None
         if origin_did:
-            for _, agent in self._agents.items():
+            for agent in self._agents.values():
                 if agent.did == origin_did:
                     did_agent = agent
                     break
 
         if not did_agent:
-            did_agent = next(self._agents.items())
+            did_agent = next(iter(self._agents.values()))
 
         if not did_agent.synced:
             raise IndyConfigError("Agent is not yet synchronized: {}".format(did_agent.agent_id))

@@ -65,6 +65,15 @@ class CredentialDependencyGraph(DiGraph):
         self.add_node(node_b.id, **node_b.node_data)
         super().add_edge(node_a.id, node_b.id)
 
+    def annotate_edge(self, node_a, node_b, **kwargs):
+        """
+        Overrides add_edge method to add
+        extra meta data to each node
+        """
+
+        for kw, arg in kwargs:
+            self.edges[(node_a.id, node_b.id)][kw] = arg
+
     def serialize(self):
         """
         Returns a json representation of the graph
@@ -91,12 +100,12 @@ class CredentialDependencyGraph(DiGraph):
         This value doubles as a distributed pointer
         for context as the graph propogates through the network.
         """
-        for node in self.nodes:
-            try:
-                del self.nodes[node]["root"]
-            except KeyError:
-                pass
-        self.nodes[node]["root"] = True
+        # for n in self.nodes:
+        #     try:
+        #         del self.nodes[n]["root"]
+        #     except KeyError:
+        #         pass
+        self.nodes[node.id]["root"] = True
 
     def get_root(self):
         """
