@@ -38,6 +38,10 @@ class EdgeAlreadyExistsError(CredentialDependencyError):
     pass
 
 
+class NoSelfLoopsError(CredentialDependencyError):
+    pass
+
+
 class CredentialDependencyGraph(DiGraph):
     """
     A directed acyclic graph that represents the dependency relationships
@@ -57,6 +61,9 @@ class CredentialDependencyGraph(DiGraph):
         Overrides add_edge method to add
         extra meta data to each node
         """
+
+        if node_a.id == node_b.id:
+            raise NoSelfLoopsError()
 
         if (node_a.id, node_b.id) in self.edges:
             raise EdgeAlreadyExistsError()
@@ -94,17 +101,19 @@ class CredentialDependencyGraph(DiGraph):
         graph = json_graph.node_link_graph(graph_data)
         return graph
 
+    def clear_root(self):
+        """
+        Clears the 'root' node for this graph
+        """
+        for node in self.nodes:
+            self.nodes[node]["root"] = False
+
     def set_root(self, node):
         """
         Sets the 'root' node for this graph.
         This value doubles as a distributed pointer
         for context as the graph propogates through the network.
         """
-        # for n in self.nodes:
-        #     try:
-        #         del self.nodes[n]["root"]
-        #     except KeyError:
-        #         pass
         self.nodes[node.id]["root"] = True
 
     def get_root(self):
@@ -145,6 +154,7 @@ class CredentialDependency:
             )
 
         self.graph.add_node(self.id, **self.node_data)
+        self.graph.clear_root()
         self.graph.set_root(self)
 
     @property

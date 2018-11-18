@@ -50,7 +50,8 @@ from ..common.util import log_json
 from ..common.dependencies import (
     CredentialDependency,
     CredentialDependencyGraph,
-    EdgeAlreadyExistsError
+    EdgeAlreadyExistsError,
+    NoSelfLoopsError
 )
 
 from .config import (
@@ -1026,12 +1027,18 @@ class IndyService(ServiceBase):
         return await self._verify_proof(verifier.agent_id, proof_req, proof)
 
     async def _get_credential_dependencies(self, schema_name: str, schema_version: str,
-                                           origin_did: str, dependency_graph: dict) -> CredentialDependencies:
+                                           origin_did: str, dependency_graph: dict,
+                                           visited_dids) -> CredentialDependencies:
         """
         Request dependency graph for a credential
         """
+        if not visited_dids:
+            visited_dids = []
 
         dependency = CredentialDependency(schema_name, schema_version, origin_did, dependency_graph)
+
+        LOGGER.info("dependency.id")
+        LOGGER.info(dependency.id)
 
         did_agent = None
         if origin_did:
@@ -1046,7 +1053,9 @@ class IndyService(ServiceBase):
         if not did_agent.synced:
             raise IndyConfigError("Agent is not yet synchronized: {}".format(did_agent.agent_id))
             
-        if origin_did and did_agent.did != origin_did:
+        LOGGER.info("visited_dids")
+        LOGGER.info(visited_dids)
+        if origin_did and did_agent.did != origin_did and origin_did not in visited_dids:
             # If we are given a did and it is not this agent's did, we attempt to
             # hop to the next agent and continue to recurse
             endpoint = await self._get_endpoint(origin_did)
@@ -1061,12 +1070,14 @@ class IndyService(ServiceBase):
 
             # TODO: move this into HTTPClient
             try:
+                LOGGER.info("request")
+                LOGGER.info(f"{dependency.schema_name}:{dependency.schema_version}:{dependency.origin_did}")
                 async with self.http as client:
                     response = await client.post("{}/get-credential-dependencies".format(endpoint), params={
                         "schema_name": dependency.schema_name,
                         "schema_version": dependency.schema_version,
                         "origin_did": dependency.origin_did
-                    }, json=dependency.graph.serialize())
+                    }, json={"dependency_graph": dependency.graph.serialize(), "visited_dids": visited_dids})
                 resp_json = await response.text()
                 resp = json.loads(resp_json)
 
@@ -1075,24 +1086,30 @@ class IndyService(ServiceBase):
 
                 if success is False:
                     raise IndyError("Agent at endpoint {} responded with error: {}".format(endpoint, result))
+                else:
+                    visited_dids.append(origin_did)
 
                 graph = CredentialDependencyGraph(result)
                 dep = graph.get_root()
 
+                LOGGER.info("dep_root")
+                LOGGER.info(dep.id)
+
                 try:
-                    dependency.add_dependency(
-                        CredentialDependency(
-                            dep.schema_name,
-                            dep.schema_version,
-                            dep.origin_did
-                        )
-                    )
+                    # dependency.add_dependency(
+                    #     CredentialDependency(
+                    #         dep.schema_name,
+                    #         dep.schema_version,
+                    #         dep.origin_did
+                    #     )
+                    # )
 
                     dependency_dependencies = await self._get_credential_dependencies(
                         dep.schema_name,
                         dep.schema_version,
                         dep.origin_did,
-                        result
+                        result,
+                        visited_dids
                     )
 
                     dependency = CredentialDependency(
@@ -1101,7 +1118,7 @@ class IndyService(ServiceBase):
                         origin_did,
                         dependency_dependencies
                     )
-                except EdgeAlreadyExistsError:
+                except (EdgeAlreadyExistsError, ):
                     pass
 
             except json.decoder.JSONDecodeError:
@@ -1116,7 +1133,11 @@ class IndyService(ServiceBase):
                         for schema in proof_request.schemas:
                             dep = schema["definition"]
                             if not dep.compare(SchemaCfg(schema_name, schema_version, None, origin_did)):                                
+                                LOGGER.info("not hop dependency")
+                                LOGGER.info(f"{dep.name}:{dep.version}:{dep.origin_did}")
                                 try:
+                                    LOGGER.info("graph")
+                                    LOGGER.info(json.dumps(dependency.graph.serialize()))
                                     dependency.add_dependency(
                                         CredentialDependency(dep.name, dep.version, dep.origin_did)
                                     )
@@ -1125,16 +1146,18 @@ class IndyService(ServiceBase):
                                         dep.name,
                                         dep.version,
                                         dep.origin_did,
-                                        dependency.graph.serialize()
+                                        dependency.graph.serialize(),
+                                        visited_dids
                                     )
 
                                     dependency = CredentialDependency(
                                         schema_name, schema_version, origin_did, dependency_dependencies
                                     )
-                                except EdgeAlreadyExistsError:
+                                except (EdgeAlreadyExistsError, ):
                                     pass
-                                
 
+        LOGGER.info("returning")                        
+        LOGGER.info(json.dumps(dependency.graph.serialize()))
         return dependency.graph.serialize()
 
 
@@ -1378,7 +1401,12 @@ class IndyService(ServiceBase):
         elif isinstance(request, CredentialDependenciesReq):
             try:
                 reply = await self._get_credential_dependencies(
-                    request.schema_name, request.schema_version, request.origin_did, request.dependency_graph)
+                    request.schema_name,
+                    request.schema_version,
+                    request.origin_did,
+                    request.dependency_graph,
+                    request.visited_dids
+                )
             except IndyError as e:
                 reply = IndyServiceFail(str(e))
 

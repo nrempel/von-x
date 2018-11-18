@@ -398,6 +398,7 @@ class CredentialDependenciesReq(IndyServiceReq):
         ("schema_version", str),
         ("origin_did", str),
         ("dependency_graph", dict),
+        ("visited_dids", list),
     )
 
 class CredentialDependencies(IndyServiceRep):

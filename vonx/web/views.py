@@ -278,9 +278,12 @@ async def get_credential_dependencies(request):
     origin_did = request.query.get("origin_did")
 
     dependency_graph = None 
-    
+    visited_dids = None
+
     try:
-        dependency_graph = await get_request_json(request)
+        request_body = await get_request_json(request)
+        dependency_graph = request_body["dependency_graph"]
+        visited_dids = request_body["visited_dids"]
     except IndyRequestError: 
         pass
 
@@ -290,19 +293,9 @@ async def get_credential_dependencies(request):
             schema_name,
             schema_version,
             origin_did,
-            dependency_graph
+            dependency_graph,
+            visited_dids
         )
-
-        # def build_result(deps):
-        #     LOGGER.info('----deps-----')
-        #     LOGGER.info(deps)
-        #     return [
-        #         {
-        #             "schema_name": dependency.name,
-        #             "schema_version": dependency.version,
-        #             "dependencies": build_result(dependency.dependencies)
-        #         } for dependency in deps
-        #     ]
 
         ret = {
             "success": True,
