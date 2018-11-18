@@ -1035,11 +1035,6 @@ class IndyService(ServiceBase):
         if not visited_dids:
             visited_dids = []
 
-        dependency = CredentialDependency(schema_name, schema_version, origin_did, dependency_graph)
-
-        LOGGER.info("dependency.id")
-        LOGGER.info(dependency.id)
-
         did_agent = None
         if origin_did:
             for agent in self._agents.values():
@@ -1053,6 +1048,15 @@ class IndyService(ServiceBase):
         if not did_agent.synced:
             raise IndyConfigError("Agent is not yet synchronized: {}".format(did_agent.agent_id))
             
+        this_did = origin_did or did_agent.did
+        
+        dependency = CredentialDependency(
+            schema_name, 
+            schema_version, 
+            this_did, 
+            dependency_graph
+        )
+
         LOGGER.info("visited_dids")
         LOGGER.info(visited_dids)
         if origin_did and did_agent.did != origin_did and origin_did not in visited_dids:
@@ -1115,7 +1119,7 @@ class IndyService(ServiceBase):
                     dependency = CredentialDependency(
                         schema_name,
                         schema_version,
-                        origin_did,
+                        this_did,
                         dependency_dependencies
                     )
                 except (EdgeAlreadyExistsError, ):
@@ -1151,7 +1155,7 @@ class IndyService(ServiceBase):
                                     )
 
                                     dependency = CredentialDependency(
-                                        schema_name, schema_version, origin_did, dependency_dependencies
+                                        schema_name, schema_version, this_did, dependency_dependencies
                                     )
                                 except (EdgeAlreadyExistsError, ):
                                     pass
