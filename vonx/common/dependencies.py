@@ -42,6 +42,18 @@ class NoSelfLoopsError(CredentialDependencyError):
     pass
 
 
+class CantResolveDidError(CredentialDependencyError):
+    pass
+
+
+class CantConnectToEndpointError(CredentialDependencyError):
+    pass
+
+
+class BadResponseError(CredentialDependencyError):
+    pass
+
+
 class CredentialDependencyGraph(DiGraph):
     """
     A directed acyclic graph that represents the dependency relationships
@@ -78,7 +90,7 @@ class CredentialDependencyGraph(DiGraph):
         extra meta data to each node
         """
 
-        for kw, arg in kwargs:
+        for kw, arg in kwargs.items():
             self.edges[(node_a.id, node_b.id)][kw] = arg
 
     def serialize(self):

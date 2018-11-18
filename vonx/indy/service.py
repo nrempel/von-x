@@ -51,7 +51,10 @@ from ..common.dependencies import (
     CredentialDependency,
     CredentialDependencyGraph,
     EdgeAlreadyExistsError,
-    NoSelfLoopsError
+    NoSelfLoopsError,
+    CantResolveDidError,
+    CantConnectToEndpointError,
+    BadResponseError
 )
 
 from .config import (
@@ -1057,15 +1060,14 @@ class IndyService(ServiceBase):
             dependency_graph
         )
 
-        LOGGER.info("visited_dids")
-        LOGGER.info(visited_dids)
         if origin_did and did_agent.did != origin_did and origin_did not in visited_dids:
             # If we are given a did and it is not this agent's did, we attempt to
             # hop to the next agent and continue to recurse
             endpoint = await self._get_endpoint(origin_did)
             endpoint = endpoint.endpoint
             if not endpoint:
-                raise IndyError(
+
+                raise CantResolveDidError(
                     "Attempted to resolve dependencies for schema name: " +
                     "{}, version: {}, and did: {} but there is no endpoint published for did {}".format(
                         dependency.schema_name, dependency.schema_version,
@@ -1096,18 +1098,7 @@ class IndyService(ServiceBase):
                 graph = CredentialDependencyGraph(result)
                 dep = graph.get_root()
 
-                LOGGER.info("dep_root")
-                LOGGER.info(dep.id)
-
                 try:
-                    # dependency.add_dependency(
-                    #     CredentialDependency(
-                    #         dep.schema_name,
-                    #         dep.schema_version,
-                    #         dep.origin_did
-                    #     )
-                    # )
-
                     dependency_dependencies = await self._get_credential_dependencies(
                         dep.schema_name,
                         dep.schema_version,
@@ -1122,13 +1113,13 @@ class IndyService(ServiceBase):
                         this_did,
                         dependency_dependencies
                     )
-                except (EdgeAlreadyExistsError, ):
+                except EdgeAlreadyExistsError:
                     pass
 
             except json.decoder.JSONDecodeError:
-                raise IndyError("Could not parse respoonse from {}".format(endpoint))
+                raise BadResponseError("Could not parse respoonse from {}".format(endpoint))
             except aiohttp.client_exceptions.ClientConnectorError:
-                raise IndyError("Could not connect to endpoint {}".format(endpoint))
+                raise CantConnectToEndpointError("Could not connect to endpoint {}".format(endpoint))
         else:
             credential_type = did_agent.find_credential_type(schema_name, schema_version, origin_did)
             if credential_type:
@@ -1137,11 +1128,7 @@ class IndyService(ServiceBase):
                         for schema in proof_request.schemas:
                             dep = schema["definition"]
                             if not dep.compare(SchemaCfg(schema_name, schema_version, None, origin_did)):                                
-                                LOGGER.info("not hop dependency")
-                                LOGGER.info(f"{dep.name}:{dep.version}:{dep.origin_did}")
                                 try:
-                                    LOGGER.info("graph")
-                                    LOGGER.info(json.dumps(dependency.graph.serialize()))
                                     dependency.add_dependency(
                                         CredentialDependency(dep.name, dep.version, dep.origin_did)
                                     )
@@ -1157,11 +1144,15 @@ class IndyService(ServiceBase):
                                     dependency = CredentialDependency(
                                         schema_name, schema_version, this_did, dependency_dependencies
                                     )
-                                except (EdgeAlreadyExistsError, ):
+                                except EdgeAlreadyExistsError:
                                     pass
+                                except (CantResolveDidError, CantConnectToEndpointError, BadResponseError) as e:
+                                    dependency.graph.annotate_edge(
+                                        dependency,
+                                        CredentialDependency(dep.name, dep.version, dep.origin_did),
+                                        error=str(e)
+                                    )
 
-        LOGGER.info("returning")                        
-        LOGGER.info(json.dumps(dependency.graph.serialize()))
         return dependency.graph.serialize()
 
 
