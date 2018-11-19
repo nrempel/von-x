@@ -24,6 +24,8 @@ import json
 
 from networkx import DiGraph
 from networkx.readwrite import json_graph
+from networkx.algorithms.cycles import find_cycle
+from networkx.exception import NetworkXNoCycle
 
 
 class CredentialDependencyError(Exception):
@@ -54,6 +56,10 @@ class BadResponseError(CredentialDependencyError):
     pass
 
 
+class CircularDependencyError(CredentialDependencyError):
+    pass
+
+
 class CredentialDependencyGraph(DiGraph):
     """
     A directed acyclic graph that represents the dependency relationships
@@ -68,7 +74,7 @@ class CredentialDependencyGraph(DiGraph):
         else:
             super().__init__()
 
-    def add_edge(self, node_a, node_b):
+    def add_edge(self, node_a, node_b, detect_cycles=True):
         """
         Overrides add_edge method to add
         extra meta data to each node
@@ -79,6 +85,18 @@ class CredentialDependencyGraph(DiGraph):
 
         if (node_a.id, node_b.id) in self.edges:
             raise EdgeAlreadyExistsError()
+
+        if detect_cycles:
+            current_graph = self
+            current_graph.add_edge(node_a, node_b, False)
+            try:
+                cycle = find_cycle(current_graph)
+                cycle_strs = [f"{link[0]} -> {link[1]}" for link in cycle]
+                raise CircularDependencyError(
+                    f'Circular dependency detected: {", ".join(cycle_strs)}'
+                )
+            except NetworkXNoCycle:
+                pass
 
         self.add_node(node_a.id, **node_a.node_data)
         self.add_node(node_b.id, **node_b.node_data)

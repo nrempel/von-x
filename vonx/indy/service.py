@@ -54,7 +54,8 @@ from ..common.dependencies import (
     NoSelfLoopsError,
     CantResolveDidError,
     CantConnectToEndpointError,
-    BadResponseError
+    BadResponseError,
+    CircularDependencyError
 )
 
 from .config import (
@@ -1146,7 +1147,8 @@ class IndyService(ServiceBase):
                                     )
                                 except EdgeAlreadyExistsError:
                                     pass
-                                except (CantResolveDidError, CantConnectToEndpointError, BadResponseError) as e:
+                                except (CantResolveDidError, CantConnectToEndpointError,
+                                        BadResponseError, CircularDependencyError) as e:
                                     dependency.graph.annotate_edge(
                                         dependency,
                                         CredentialDependency(dep.name, dep.version, dep.origin_did),
