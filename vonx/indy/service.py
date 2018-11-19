@@ -1077,8 +1077,6 @@ class IndyService(ServiceBase):
 
             # TODO: move this into HTTPClient
             try:
-                LOGGER.info("request")
-                LOGGER.info(f"{dependency.schema_name}:{dependency.schema_version}:{dependency.origin_did}")
                 async with self.http as client:
                     response = await client.post("{}/get-credential-dependencies".format(endpoint), params={
                         "schema_name": dependency.schema_name,
