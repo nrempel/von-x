@@ -33,7 +33,7 @@ setup(
         'aiohttp~=3.3.0',
         'aiohttp-jinja2~=1.1.0',
         'PyYAML',
-        'von-anchor==1.6.34',
         'networkx>=2.2,<3'
+        'von-anchor==1.6.36',
     ],
 )
