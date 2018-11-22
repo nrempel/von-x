@@ -305,3 +305,26 @@ async def get_credential_dependencies(request):
     except IndyClientError as e:
         ret = {"success": False, "result": str(e)}
     return web.json_response(ret)
+
+
+async def client_proxy(request: web.Request):
+    """
+    A request handler that proxies the request to the IndyClient.
+    Useful for testing.
+    """
+    method_str = request.match_info.get('method')
+    client = indy_client(request)
+    func = getattr(client, method_str)
+    params = request.query
+
+    try:
+        result = await func(**params)
+        ret = {
+            "success": True,
+            "result": dict(result)
+        }
+
+    except IndyClientError as e:
+        ret = {"success": False, "result": str(e)}
+    return web.json_response(ret)
+    

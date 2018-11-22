@@ -49,6 +49,7 @@ def get_standard_routes(_app) -> list:
         web.post('/{holder_id}/store-credential', views.store_credential),
         web.post('/{holder_id}/construct-proof', views.construct_proof),
         #web.get('/hello', views.hello),
+        web.get('/client-proxy/{method}', views.client_proxy),
     ]
 
 
