@@ -135,6 +135,8 @@ class TobConnection(HttpConnection):
                     400,
                     response,
                 )
+            
+        return True
 
     @property
     def path_prefix(self):

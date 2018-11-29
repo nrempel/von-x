@@ -36,7 +36,14 @@ from von_anchor.util import schema_id
 
 from indy.error import IndyError, ErrorCode
 
-from .connection import ConnectionBase, ConnectionType, HolderConnection, HttpConnection
+from .connection import (
+    ConnectionBase,
+    ConnectionType,
+    HolderConnection,
+    HttpConnection,
+    Agent2AgentConnection
+)
+
 from .errors import IndyConfigError
 from .tob import CRED_TYPE_PARAMETERS, TobConnection
 
@@ -285,9 +292,10 @@ class ConnectionCfg:
 
         if self.connection_type != ConnectionType.TheOrgBook and \
                 self.connection_type != ConnectionType.HTTP and \
+                self.connection_type != ConnectionType.Agent2Agent and \
                 self.connection_type != ConnectionType.holder:
             raise IndyConfigError(
-                "Only HTTP and internal Holder connections are currently supported")
+                "Only A2A, HTTP, and internal Holder connections are currently supported")
 
     @property
     def created(self) -> bool:
@@ -325,6 +333,8 @@ class ConnectionCfg:
             cls = TobConnection
         elif self.connection_type == ConnectionType.HTTP:
             cls = HttpConnection
+        elif self.connection_type == ConnectionType.Agent2Agent:
+            cls = Agent2AgentConnection
         elif self.connection_type == ConnectionType.holder:
             cls = HolderConnection
         conn_params = self.connection_params.copy()
@@ -347,8 +357,7 @@ class ConnectionCfg:
         Perform synchronization of the connection instance
         """
         if not self.synced:
-            await self._instance.sync()
-            self.synced = True
+            self.synced = await self._instance.sync()
 
     async def close(self) -> None:
         """

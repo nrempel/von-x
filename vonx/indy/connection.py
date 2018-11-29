@@ -49,6 +49,7 @@ class ConnectionType(Enum):
     """
     Enumeration of supported connection types
     """
+    Agent2Agent = "Agent2Agent"
     TheOrgBook = "TheOrgBook"
     holder = "holder"
     HTTP = "HTTP"
@@ -468,23 +469,26 @@ class HttpConnection(ConnectionBase):
             await handler.check_status(response)
             return await response.json()
 
-class AgentToAgentConnection(ConnectionBase):
+class Agent2AgentConnection(ConnectionBase):
     """
     A class for managing communication with other agents via agent2agent communication
     """
     def __init__(self, agent_id: str, agent_type: str, agent_params: dict, conn_params: dict):
-        super(AgentToAgentConnection, self).__init__(agent_id, agent_type, agent_params, conn_params)
-        self._api_url = self.conn_params.get("api_url")
-        if not self._api_url:
-            raise IndyConfigError("Missing 'api_url' for HTTP connection")
+        super(Agent2AgentConnection, self).__init__(agent_id, agent_type, agent_params, conn_params)
         self._http_client = None
-        self._response_headers = None
 
     async def open(self, service: 'IndyService') -> None:
         """
         Initialize the connection
         """
         self._http_client = service._connection_http_client(self.conn_params["id"])
+
+    async def sync(self) -> bool:
+        """
+        Sync the connection
+        """
+        raise Exception('WASDASDASD')
+        return False
 
     async def close(self) -> None:
         """

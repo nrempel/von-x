@@ -200,6 +200,20 @@ class IndyClient:
             messages.ConnectionStatus)
         return result.connection_id
 
+    async def register_a2a_connection(self, agent_id: str, config: dict = None) -> str:
+        """
+        Register an agent2agent connection with another agent
+
+        Args:
+            agent_id: the registered issuer or verifier agent identifier
+            config: configuration parameters for the connection (must include 'api_url')
+        """
+        result = await self._fetch(
+            messages.RegisterConnectionReq(ConnectionType.Agent2Agent.value, agent_id, config or {}),
+            messages.ConnectionStatus)
+        return result.connection_id
+
+
     async def register_holder_connection(self, agent_id: str, config: dict = None) -> str:
         """
         Register a connection to a local holder agent

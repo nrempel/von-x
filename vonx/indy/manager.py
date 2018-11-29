@@ -251,6 +251,9 @@ class IndyManager(ConfigServiceManager):
             if conn_type == "TheOrgBook":
                 _conn_id = await client.register_orgbook_connection(
                     issuer_id, connection_cfg)
+            elif conn_type == "Agent2Agent":
+                _conn_id = await client.register_a2a_connection(
+                    issuer_id, connection_cfg)
             else:
                 _conn_id = await client.register_http_connection(
                     issuer_id, connection_cfg)
