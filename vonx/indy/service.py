@@ -1359,7 +1359,6 @@ class IndyService(ServiceBase):
         Args:
             agent_id: the identifier of the agent
         """
-        LOGGER.info(self._agents)
         agent = self._agents.get(agent_id)
         if not agent:
             raise IndyConfigError("Agent ID not registered: {}".format(agent_id))
