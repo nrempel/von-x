@@ -396,18 +396,20 @@ async def get_credential_dependencies(request):
         ret = {"success": False, "result": str(e)}
     return web.json_response(ret)
 
-async def get_invite(request):
+async def get_invite(request, agent_id: str = None):
     """
     Generate an invite to connect with this agent
 
     Returns: An invite json payload
     """
+    
+    agent_id = get_handle_id(request, "agent_id", agent_id)
     try:
         client = indy_client(request)
-        result = await client.get_invite()
+        result = await client.generate_invite(agent_id)
         ret = {
             "success": True,
-            "result": result
+            "result": dict(result)
         }
     except IndyClientError as e:
         ret = {"success": False, "result": str(e)}

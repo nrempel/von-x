@@ -487,7 +487,7 @@ class Agent2AgentConnection(ConnectionBase):
         """
         Sync the connection
         """
-        raise Exception('WASDASDASD')
+        # TODO: talk to other agent via a2a connection invite
         return False
 
     async def close(self) -> None:

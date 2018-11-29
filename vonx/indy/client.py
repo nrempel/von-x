@@ -214,6 +214,16 @@ class IndyClient:
         return result.connection_id
 
 
+    async def generate_invite(self, agent_id: str) -> str:
+        """
+        Generate a2a connection invite
+
+        Args:
+            agent_id: the identifier of the agent
+        """
+        return await self._fetch(messages.A2AInviteReq(agent_id), messages.A2AInvite)
+
+
     async def register_holder_connection(self, agent_id: str, config: dict = None) -> str:
         """
         Register a connection to a local holder agent

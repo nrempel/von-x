@@ -69,6 +69,23 @@ class LedgerStatus(IndyServiceRep):
         "status",
     )
 
+class A2AInviteReq(IndyServiceReq):
+    """
+    A request to generate an a2a invite
+    """
+    _fields = (
+        ("agent_id", str),
+    )
+
+class A2AInvite(IndyServiceRep):
+    """
+    The response to a a2a invite request
+    """
+    _fields = (
+        ("@type", str),
+        ("key", str),
+        ("endpoint", dict)
+    )
 
 class RegisterWalletReq(IndyServiceReq):
     """

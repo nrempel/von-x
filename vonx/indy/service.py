@@ -30,6 +30,7 @@ import random
 import string
 import time
 from typing import Mapping, Sequence
+from uuid import uuid4
 
 import aiohttp
 
@@ -1351,6 +1352,32 @@ class IndyService(ServiceBase):
             return ret
         return None
 
+    async def _generate_a2a_invite(self, agent_id: str):
+        """
+        Generate a connection invite object
+
+        Args:
+            agent_id: the identifier of the agent
+        """
+        LOGGER.info(self._agents)
+        agent = self._agents.get(agent_id)
+        if not agent:
+            raise IndyConfigError("Agent ID not registered: {}".format(agent_id))
+
+        # TODO: Move to A2A message class
+        invite = {
+            "@type" : "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/connection/invite",
+            "key" : str(uuid4()).replace("-", ""),
+            "endpoint" : {
+                "did" : agent.did
+                # Also possible:
+                # "verkey" : "<inviter-domain-endpoint-verkey>",
+                # "uri" : "<inviter-domain-endpoint-uri>"
+            }
+        }
+
+        return messages.A2AInvite(**invite)
+
     async def _service_request(self, request: ServiceRequest) -> ServiceResponse:
         """
         Process a message from the exchange and send the reply, if any
@@ -1543,6 +1570,12 @@ class IndyService(ServiceBase):
             try:
                 with self._timer("resolve_nym"):
                     reply = await self._resolve_nym(request.did, request.agent_id)
+            except IndyError as e:
+                reply = messages.IndyServiceFail(str(e))
+
+        elif isinstance(request, messages.A2AInviteReq):
+            try:
+                reply = await self._generate_a2a_invite(request.agent_id)
             except IndyError as e:
                 reply = messages.IndyServiceFail(str(e))
 
