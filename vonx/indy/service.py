@@ -40,6 +40,8 @@ from von_anchor.nodepool import NodePool
 from von_anchor.util import cred_def_id, revealed_attrs, schema_id, schema_key, \
     proof_req_infos2briefs, proof_req_briefs2req_creds
 
+from indy import pairwise, did, wallet, non_secrets
+
 from ..common.service import (
     Exchange,
     ServiceBase,
@@ -1352,6 +1354,7 @@ class IndyService(ServiceBase):
             return ret
         return None
 
+    # TODO: rename to "create invite"
     async def _generate_a2a_invite(self, agent_id: str):
         """
         Generate a connection invite object
@@ -1376,6 +1379,56 @@ class IndyService(ServiceBase):
         }
 
         return messages.A2AInvite(**invite)
+
+    # TODO: rename to "accept invite"
+    async def _create_a2a_connection_request(self, invite: dict, agent_id: str):
+        """
+        Generate a connection invite object
+
+        Args:
+            invite: the invite obtained from the other party
+            agent_id: the agent id the connection is being formed with
+        """
+        
+        agent = self._agents.get(agent_id)
+        if not agent:
+            raise IndyConfigError("Agent ID not registered: {}".format(agent_id))
+
+        # Generate new pairwise did
+        my_pairwise_did, my_pairwise_verkey = await did.create_and_store_my_did(
+            agent.instance.wallet.handle,
+            "{}"
+        )
+
+        connection_id = str(uuid4()).replace("-", "")
+        
+        connection_record = {
+            "endpoint": invite["endpoint"],
+            "my_did": my_pairwise_did,
+            "my_verkey": my_pairwise_verkey
+        }
+
+        await non_secrets.add_wallet_record(
+            agent.instance.wallet.handle,
+            "connection_record",
+            connection_id,
+            json.dumps(connection_record),
+            None
+        )
+
+        connection_request = {
+            "@type" : "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/connection/request",
+            "did" : my_pairwise_did,
+            "verkey" : my_pairwise_verkey,
+            "endpoint" : {
+                "did" : agent.did
+                # Also possible:
+                # "verkey" : "<invitees-domain-endpoint-verkey>",
+                # "uri" : "<invitees-domain-endpoint-uri>"
+            }
+        }
+
+        return connection_request
 
     async def _service_request(self, request: ServiceRequest) -> ServiceResponse:
         """

@@ -475,19 +475,53 @@ class Agent2AgentConnection(ConnectionBase):
     """
     def __init__(self, agent_id: str, agent_type: str, agent_params: dict, conn_params: dict):
         super(Agent2AgentConnection, self).__init__(agent_id, agent_type, agent_params, conn_params)
+        self._connection_did = conn_params.get('did')
+        self._connection_agent_id = conn_params.get('agent')
         self._http_client = None
+        self._connection_endpoint = None
+        self._service = None
 
     async def open(self, service: 'IndyService') -> None:
         """
         Initialize the connection
         """
         self._http_client = service._connection_http_client(self.conn_params["id"])
+        self._connection_endpoint = (await service._get_endpoint(self._connection_did)).endpoint
+        self._service = service
 
     async def sync(self) -> bool:
         """
         Sync the connection
         """
-        # TODO: talk to other agent via a2a connection invite
+        LOGGER.info('=======')
+        LOGGER.info(self._connection_agent_id)
+        
+        async with self._http_client as http_client:
+            LOGGER.info('request get-invite')
+            resp = await http_client.get("{}/{}/get-invite".format(
+                self._connection_endpoint, self._connection_agent_id)
+            )
+            invite = (await resp.json())['result']
+            
+            connection_request = await self._service._create_a2a_connection_request(
+                invite, self.agent_id
+            )
+
+            LOGGER.info('connection_request')
+            LOGGER.info(connection_request)
+
+            
+            LOGGER.info('request connection-request')
+            resp = await http_client.get("{}/{}/connection-request".format(
+                self._connection_endpoint, self._connection_agent_id)
+            )
+        
+        
+        LOGGER.info('-------')
+        LOGGER.info(invite)
+
+
+
         return False
 
     async def close(self) -> None:

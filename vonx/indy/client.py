@@ -206,7 +206,7 @@ class IndyClient:
 
         Args:
             agent_id: the registered issuer or verifier agent identifier
-            config: configuration parameters for the connection (must include 'api_url')
+            config: configuration parameters for the connection (must include 'did')
         """
         result = await self._fetch(
             messages.RegisterConnectionReq(ConnectionType.Agent2Agent.value, agent_id, config or {}),
