@@ -498,8 +498,7 @@ class Agent2AgentConnection(ConnectionBase):
         
         async with self._http_client as http_client:
             LOGGER.info('request get-invite')
-            resp = await http_client.get("{}/{}/get-invite".format(
-                self._connection_endpoint, self._connection_agent_id)
+            resp = await http_client.get("{}/get-invite".format(self._connection_endpoint)
             )
             invite = (await resp.json())['result']
             
@@ -512,9 +511,14 @@ class Agent2AgentConnection(ConnectionBase):
 
             
             LOGGER.info('request connection-request')
-            resp = await http_client.get("{}/{}/connection-request".format(
-                self._connection_endpoint, self._connection_agent_id)
+            resp = await http_client.post(
+                "{}/connection-request".format(self._connection_endpoint),
+                json=connection_request
             )
+
+            # resp_json = await resp.json()
+            LOGGER.info(resp)
+            LOGGER.info(await resp.text())
         
         
         LOGGER.info('-------')

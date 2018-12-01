@@ -1430,6 +1430,62 @@ class IndyService(ServiceBase):
 
         return connection_request
 
+    async def _process_a2a_connection_request(self, agent_id: str, connection_request: dict):
+        """
+        Process a connection request. Generate a connection response
+
+        Args:
+            agent_id: the identifier of the agent
+        """
+        agent = self._agents.get(agent_id)
+        if not agent:
+            raise IndyConfigError("Agent ID not registered: {}".format(agent_id))
+
+        my_pairwise_did, my_pairwise_verkey = await did.create_and_store_my_did(
+            agent.instance.wallet.handle,
+            "{}"
+        )
+
+        # TODO: Move to A2A message class
+        connection_response = {
+            "@type" : "did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/connection/response",
+            "did" : my_pairwise_did,
+            "verkey" : my_pairwise_verkey,
+            "endpoint" : {
+                "did" : agent.did
+                # Also possible:
+                # "verkey" : "<inviter-domain-endpoint-verkey>",
+                # "uri" : "<inviter-domain-endpoint-uri>"
+            }
+        }
+
+        endpoint = await self._get_endpoint(connection_request["endpoint"]["did"])
+        endpoint = endpoint.endpoint
+
+        async with self.http as http_client:
+            resp = await http_client.post(
+                "{}/connection-response".format(endpoint),
+                json=connection_response
+            )
+
+        LOGGER.info(await resp.text())
+        
+
+        LOGGER.info(',,,,,,,,,')
+        
+        LOGGER.info(connection_request)
+
+    async def _process_a2a_connection_response(self, agent_id: str, connection_respoonse: dict):
+        """
+        Process a connection response. Create pairwise connection
+
+        Args:
+            agent_id: the identifier of the agent
+        """
+        pass
+        # TODO
+
+
     async def _service_request(self, request: ServiceRequest) -> ServiceResponse:
         """
         Process a message from the exchange and send the reply, if any
@@ -1628,6 +1684,20 @@ class IndyService(ServiceBase):
         elif isinstance(request, messages.A2AInviteReq):
             try:
                 reply = await self._generate_a2a_invite(request.agent_id)
+            except IndyError as e:
+                reply = messages.IndyServiceFail(str(e))
+        elif isinstance(request, messages.A2AConnectionRequestReq):
+            try:
+                reply = await self._process_a2a_connection_request(
+                    request.agent_id,
+                    request.connection_request)
+            except IndyError as e:
+                reply = messages.IndyServiceFail(str(e))
+        elif isinstance(request, messages.A2AConnectionResponseReq):
+            try:
+                reply = await self._process_a2a_connection_response(
+                    request.agent_id,
+                    request.connection_response)
             except IndyError as e:
                 reply = messages.IndyServiceFail(str(e))
 

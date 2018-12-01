@@ -43,6 +43,8 @@ def get_standard_routes(_app) -> list:
         web.get('/{connection_id}/search_credential/{org_name}', views.search_credential),
         web.get('/{connection_id}/filter_credential/{org_name}/{proof_name}', views.filter_credential),
         web.get('/{agent_id}/get-invite', views.get_invite),
+        web.post('/{agent_id}/connection-request', views.connection_request),
+        web.post('/{agent_id}/connection-response', views.connection_response),
         web.post('/{ignore_me}/get-credential-dependencies', views.get_credential_dependencies),
         web.post('/get-credential-dependencies', views.get_credential_dependencies),
         web.post('/issue-credential', views.issue_credential),

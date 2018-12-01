@@ -87,6 +87,25 @@ class A2AInvite(IndyServiceRep):
         ("endpoint", dict)
     )
 
+class A2AConnectionRequestReq(IndyServiceReq):
+    """
+    A request to process an a2a connection request
+    """
+    _fields = (
+        ("agent_id", str),
+        ("connection_request", dict),
+    )
+
+class A2AConnectionResponseReq(IndyServiceReq):
+    """
+    A request to process an a2a connection response
+    """
+    _fields = (
+        ("agent_id", str),
+        ("connection_response", dict),
+    )
+
+
 class RegisterWalletReq(IndyServiceReq):
     """
     A request to register a wallet

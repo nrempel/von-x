@@ -415,6 +415,44 @@ async def get_invite(request, agent_id: str = None):
         ret = {"success": False, "result": str(e)}
     return web.json_response(ret)
 
+
+async def connection_request(request, agent_id: str = None):
+    """
+    Receive connection request
+
+    Returns: success true/false
+    """
+
+    agent_id = get_handle_id(request, "agent_id", agent_id)
+    request_body = await get_request_json(request)
+    try:
+        client = indy_client(request)
+        await client.connection_request(agent_id, request_body)
+        ret = {"success": True}
+    except IndyClientError as e:
+        ret = {"success": False, "result": str(e)}
+    return web.json_response(ret)
+
+
+async def connection_response(request, agent_id: str = None):
+    """
+    Receive connection response
+
+    Returns: success true/false
+    """
+
+    agent_id = get_handle_id(request, "agent_id", agent_id)
+    request_body = await get_request_json(request)
+    try:
+        client = indy_client(request)
+        await client.connection_response(agent_id, request_body)
+        ret = {"success": True}
+    except IndyClientError as e:
+        ret = {"success": False, "result": str(e)}
+    return web.json_response(ret)
+
+
+
 async def client_proxy(request: web.Request):
     """
     A request handler that proxies the request to the IndyClient.

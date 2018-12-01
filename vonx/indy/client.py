@@ -224,6 +224,27 @@ class IndyClient:
         return await self._fetch(messages.A2AInviteReq(agent_id), messages.A2AInvite)
 
 
+    async def connection_request(self, agent_id: str, connection_request: dict) -> str:
+        """
+        Process a connection request
+
+        Args:
+            agent_id: the identifier of the agent
+            connection_request: connection_request payload from requesting agent
+        """
+        return await self._fetch(messages.A2AConnectionRequestReq(agent_id, connection_request))
+
+
+    async def connection_response(self, agent_id: str, connection_response: dict) -> str:
+        """
+        Process a connection response
+
+        Args:
+            agent_id: the identifier of the agent
+            connection_response: connection_response payload from requesting agent
+        """
+        return await self._fetch(messages.A2AConnectionRequestReq(agent_id, connection_response))
+
     async def register_holder_connection(self, agent_id: str, config: dict = None) -> str:
         """
         Register a connection to a local holder agent
